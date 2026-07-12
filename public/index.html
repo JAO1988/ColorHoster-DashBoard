@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ColorHoster Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        /* Fallback default colors before JavaScript loads */
+        :root {
+            --bg-base: #111827;
+            --bg-panel: #1f2937;
+            --bg-inset: #000000;
+            --text-main: #ffffff;
+            --text-muted: #9ca3af;
+            --border-color: #374151;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+        }
+    </style>
+</head>
+<body class="bg-[var(--bg-base)] text-[var(--text-main)] min-h-screen p-6 font-sans transition-colors duration-300">
+
+<header class="max-w-6xl mx-auto py-6 flex justify-between items-center">
+    <div class="flex flex-col items-start">
+        <h1 class="text-4xl font-extrabold text-[var(--text-main)] tracking-tight">
+            ColorHoster <span class="text-[var(--accent)] transition-colors duration-300">Dashboard</span>
+        </h1>
+        <p class="text-sm text-[var(--text-muted)] font-mono mt-1 opacity-80 font-bold">Version 0.1</p>
+    </div>
+
+    <div class="relative group z-50">
+        <button class="bg-[var(--bg-panel)] text-[var(--text-main)] border border-[var(--border-color)] px-4 py-2 rounded text-sm hover:opacity-80 focus:outline-none transition-colors duration-300">
+            Select Theme ▼
+        </button>
+        <div class="absolute right-0 mt-2 w-48 bg-[var(--bg-panel)] border border-[var(--border-color)] rounded shadow-xl opacity-0 invisible group-focus-within:opacity-100 group-focus-within:visible transition-all">
+            <div id="theme-menu" class="py-1">
+                </div>
+        </div>
+    </div>
+</header>
+
+<div class="max-w-6xl mx-auto relative z-10">
+    <div class="flex gap-6 mb-2">
+        <div class="flex-grow flex items-center justify-between">
+            <h2 class="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Logs</h2>
+
+            <div id="status-indicator" class="flex items-center gap-2">
+                <span class="text-xs font-bold text-[var(--accent)] uppercase tracking-wider">Client Status:</span>
+                <div id="status-dot" class="w-2 h-2 rounded-full bg-gray-500"></div>
+                <span id="status-text" class="text-[10px] text-[var(--text-muted)] uppercase italic tracking-wider">Checking...</span>
+            </div>
+        </div>
+
+        <div class="w-1/3">
+            <h2 class="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Device Configuration</h2>
+        </div>
+
+    </div>
+
+    <div class="flex gap-6 mb-6 h-[300px]">
+        <div class="flex-grow flex flex-col">
+            <div id="log-container" class="bg-[var(--bg-inset)] p-4 rounded border border-[var(--border-color)] flex-grow overflow-y-auto font-mono text-[10px] shadow-inner transition-colors duration-300">
+                <p class="text-[var(--accent)]">Connecting to logs...</p>
+            </div>
+        </div>
+
+        <div class="w-1/3 bg-[var(--bg-panel)] p-6 rounded border border-[var(--border-color)] flex flex-col justify-between transition-colors duration-300 shadow-md">
+            <div>
+                <label class="block text-xs text-[var(--text-muted)] uppercase mb-1 font-semibold tracking-wider">Active Port</label>
+                <input type="number" id="setting-port" class="w-full bg-[var(--bg-base)] border border-[var(--border-color)] rounded p-2 text-[var(--text-main)] mb-6 focus:border-[var(--accent)] outline-none transition-colors duration-300 shadow-inner">
+                <label class="flex items-center justify-between cursor-pointer mb-6">
+                    <span class="text-sm text-[var(--text-main)] font-medium">LED Brightness</span>
+                    <input type="checkbox" id="brightness-toggle" class="w-5 h-5 accent-[var(--accent)]">
+                </label>
+            </div>
+            <button onclick="applySettings()" class="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold py-2.5 rounded transition-colors duration-300 shadow">
+                Apply Settings
+            </button>
+        </div>
+    </div>
+
+    <div class="bg-[var(--bg-panel)] p-6 rounded border border-[var(--border-color)] transition-colors duration-300 shadow-md">
+        <h3 class="font-bold text-[var(--accent)] mb-4 transition-colors duration-300">LED Matrix Layout - <span id="keyboard-name" class="text-[var(--text-muted)] italic text-sm font-normal"></span></h3>
+        <div id="matrix-canvas" class="bg-[var(--bg-inset)] p-4 rounded border border-[var(--border-color)] relative overflow-x-auto transition-colors duration-300 shadow-inner" style="height: 350px; min-width: 1000px;">
+            <p class="text-[var(--text-muted)] text-center mt-32">Loading layout...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const socket = io();
+    const logContainer = document.getElementById('log-container');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+
+function checkLogForStatus(text) {
+        const lower = text.toLowerCase();
+
+        if (lower.includes("disconnected")) {
+            statusDot.className = "w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]";
+            statusText.textContent = "Inactive";
+            statusText.className = "text-[10px] text-red-500 uppercase font-bold tracking-wider";
+        } else if (lower.includes("connected")) {
+            statusDot.className = "w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]";
+            statusText.textContent = "Active";
+            statusText.className = "text-[10px] text-green-500 uppercase font-bold tracking-wider";
+        }
+    }
+
+    function stripAnsi(str) {
+        return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+    }
+
+    function appendLogLine(text) {
+        if (!text.trim()) return;
+        const cleanText = stripAnsi(text);
+        checkLogForStatus(cleanText);
+
+        const p = document.createElement('p');
+        p.className = "border-b border-[var(--bg-base)] py-1 font-mono text-[10px] text-[var(--text-muted)] leading-tight transition-colors duration-300";
+        p.textContent = cleanText;
+        logContainer.appendChild(p);
+    }
+
+    socket.on('log_snapshot', (data) => {
+        logContainer.innerHTML = '';
+        data.split('\n').forEach(line => appendLogLine(line));
+        logContainer.scrollTop = logContainer.scrollHeight;
+    });
+
+    socket.on('log_update', (msg) => {
+        appendLogLine(msg);
+        logContainer.scrollTop = logContainer.scrollHeight;
+    });
+
+    async function fetchSettings() {
+        try {
+            const res = await fetch('/api/settings', { cache: "no-store" });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            document.getElementById('setting-port').value = data.port || '';
+            document.getElementById('brightness-toggle').checked = !!data.brightness;
+        } catch (e) { console.error("Settings load failed"); }
+    }
+
+    async function fetchLayout() {
+        try {
+            const res = await fetch('/api/layout');
+            const data = await res.json();
+            renderMatrix(data);
+        } catch (e) {
+            document.getElementById('matrix-canvas').innerHTML = '<p class="text-red-500 p-4">Error loading layout.</p>';
+        }
+    }
+
+    function renderMatrix(json) {
+        const canvas = document.getElementById('matrix-canvas');
+        document.getElementById('keyboard-name').textContent = json.name || "";
+        canvas.innerHTML = '';
+        const UNIT = 45, GAP = 5;
+        let x = 0, y = 0;
+
+        json.layouts.keymap.forEach(row => {
+            let w = 1, h = 1;
+            row.forEach(item => {
+                if (typeof item === 'object') {
+                    if (item.x) x += item.x;
+                    if (item.y) y += item.y;
+                    if (item.w) w = item.w;
+                    if (item.h) h = item.h;
+                } else {
+                    const div = document.createElement('div');
+                    // The keys remain their standard mechanical gray so they don't get lost in the theme colors
+                    div.className = 'absolute bg-[#374151] border border-[#4B5563] border-b-[4px] border-b-[#1F2937] rounded-md flex items-center justify-center text-[10px] font-semibold text-gray-300 select-none shadow-sm';
+                    div.style.width = (w * UNIT - GAP) + 'px';
+                    div.style.height = (h * UNIT - GAP) + 'px';
+                    div.style.left = (x * UNIT) + 'px';
+                    div.style.top = (y * UNIT) + 'px';
+                    div.textContent = item.split('\n')[0];
+                    canvas.appendChild(div);
+                    x += w; w = 1; h = 1;
+                }
+            });
+            x = 0; y += 1;
+        });
+    }
+
+    async function applySettings() {
+        const port = parseInt(document.getElementById('setting-port').value, 10);
+        const brightness = document.getElementById('brightness-toggle').checked;
+
+        try {
+            const res = await fetch('/api/settings/apply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ port, brightness })
+            });
+            const result = await res.json();
+            alert(result.success ? "Settings Saved!" : "Failed to save: " + (result.error || "Unknown error"));
+        } catch (e) {
+            console.error("Apply settings error:", e);
+            alert("Failed to save due to network or server error.");
+        }
+    }
+
+    async function loadThemes() {
+        try {
+            const res = await fetch('/themes.json');
+            const themes = await res.json();
+            const menu = document.getElementById('theme-menu');
+
+            Object.keys(themes).forEach(name => {
+                const link = document.createElement('a');
+                link.href = "#";
+                // Styled dropdown items
+                link.className = "block px-4 py-2 text-sm text-[var(--text-main)] hover:bg-[var(--accent)] hover:text-white transition-colors duration-150";
+                link.textContent = name;
+                link.onclick = (e) => {
+                    e.preventDefault();
+                    applyTheme(themes[name]);
+                };
+                menu.appendChild(link);
+            });
+        } catch (e) {
+            console.error("Failed to load themes", e);
+        }
+    }
+
+    function applyTheme(themeColors) {
+        const root = document.documentElement;
+        // Loop through the CSS variables in the JSON and apply them to the :root
+        Object.keys(themeColors).forEach(key => {
+            root.style.setProperty(key, themeColors[key]);
+        });
+        localStorage.setItem('selectedTheme', JSON.stringify(themeColors));
+    }
+
+    window.onload = () => {
+        const savedTheme = localStorage.getItem('selectedTheme');
+        if (savedTheme) {
+            applyTheme(JSON.parse(savedTheme));
+        }
+        fetchSettings();
+        fetchLayout();
+        loadThemes();
+    };
+</script>
+</body>
+</html>

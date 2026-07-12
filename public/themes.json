@@ -1,0 +1,92 @@
+{
+  "Default": {
+    "--bg-base": "#111827",
+    "--bg-panel": "#1f2937",
+    "--bg-inset": "#000000",
+    "--text-main": "#ffffff",
+    "--text-muted": "#9ca3af",
+    "--border-color": "#374151",
+    "--accent": "#2563eb",
+    "--accent-hover": "#1d4ed8"
+  },
+  "Catppuccin": {
+    "--bg-base": "#1e1e2e",
+    "--bg-panel": "#313244",
+    "--bg-inset": "#11111b",
+    "--text-main": "#cdd6f4",
+    "--text-muted": "#a6adc8",
+    "--border-color": "#45475a",
+    "--accent": "#89b4fa",
+    "--accent-hover": "#b4befe"
+  },
+  "Gruvbox": {
+    "--bg-base": "#282828",
+    "--bg-panel": "#3c3836",
+    "--bg-inset": "#1d2021",
+    "--text-main": "#ebdbb2",
+    "--text-muted": "#a89984",
+    "--border-color": "#504945",
+    "--accent": "#fabd2f",
+    "--accent-hover": "#d79921"
+  },
+  "Kanagawa": {
+    "--bg-base": "#1f1f28",
+    "--bg-panel": "#2a2a37",
+    "--bg-inset": "#16161d",
+    "--text-main": "#dcd7ba",
+    "--text-muted": "#727169",
+    "--border-color": "#363646",
+    "--accent": "#7e9cd8",
+    "--accent-hover": "#957fb8"
+  },
+  "Aritim Dark": {
+    "--bg-base": "#0a0e14",
+    "--bg-panel": "#1f2430",
+    "--bg-inset": "#00010a",
+    "--text-main": "#b3b1ad",
+    "--text-muted": "#4d5566",
+    "--border-color": "#303640",
+    "--accent": "#39bae6",
+    "--accent-hover": "#59c2e6"
+  },
+  "Oxygen Dark": {
+    "--bg-base": "#232629",
+    "--bg-panel": "#31363b",
+    "--bg-inset": "#1a1c1f",
+    "--text-main": "#eff0f1",
+    "--text-muted": "#7f8c8d",
+    "--border-color": "#4d5057",
+    "--accent": "#3daee9",
+    "--accent-hover": "#1d99df"
+  },
+  "Otto": {
+    "--bg-base": "#1a1a1a",
+    "--bg-panel": "#222222",
+    "--bg-inset": "#0a0a0a",
+    "--text-main": "#f8f8f8",
+    "--text-muted": "#a3a3a3",
+    "--border-color": "#3d3d3d",
+    "--accent": "#eb001f",
+    "--accent-hover": "#ff889e"
+  },
+  "MateriaDark": {
+    "--bg-base": "#263238",
+    "--bg-panel": "#37474f",
+    "--bg-inset": "#1c252a",
+    "--text-main": "#ffffff",
+    "--text-muted": "#b0bec5",
+    "--border-color": "#455a64",
+    "--accent": "#80cbc4",
+    "--accent-hover": "#4db6ac"
+  },
+  "Dracula": {
+    "--bg-base": "#282a36",
+    "--bg-panel": "#44475a",
+    "--bg-inset": "#21222c",
+    "--text-main": "#f8f8f2",
+    "--text-muted": "#6272a4",
+    "--border-color": "#6272a4",
+    "--accent": "#ff79c6",
+    "--accent-hover": "#bd93f9"
+  }
+}
