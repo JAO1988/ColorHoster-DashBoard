@@ -79,9 +79,13 @@
         </div>
     </div>
 
-            <div class="bg-[var(--bg-panel)] p-6 rounded border border-[var(--border-color)] transition-colors duration-300 shadow-md flex flex-col">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="font-bold text-[var(--accent)] transition-colors duration-300">LED Matrix Layout - <span id="keyboard-name" class="text-[var(--text-muted)] italic text-sm font-normal"></span></h3>
+<div class="bg-[var(--bg-panel)] p-6 rounded border border-[var(--border-color)] transition-colors duration-300 shadow-md flex flex-col">
+    <div class="flex justify-between items-start mb-4">
+        <div class="flex flex-col">
+            <h3 class="font-bold text-[var(--accent)] transition-colors duration-300">
+                LED Matrix Layout - <span id="keyboard-name" class="text-[var(--text-muted)] italic text-sm font-normal"></span>
+            </h3>
+        </div>
 
             <select id="layout-selector" onchange="loadSelectedLayout()" class="bg-[var(--bg-base)] text-[var(--text-main)] border border-[var(--border-color)] text-sm px-3 py-1.5 rounded cursor-pointer focus:border-[var(--accent)] outline-none transition-colors duration-300 shadow-inner">
             </select>
@@ -89,7 +93,11 @@
 
         <div id="matrix-canvas" class="bg-[var(--bg-inset)] p-4 rounded border border-[var(--border-color)] relative overflow-x-auto transition-colors duration-300 shadow-inner" style="height: 350px; min-width: 1000px;">
             <p class="text-[var(--text-muted)] text-center mt-32">Loading layout...</p>
+
         </div>
+            <p class="text-xs text-[var(--text-muted)] mt-1 font-medium select-none">
+                Size — Rows: <span id="matrix-rows" class="text-[var(--text-main)] font-bold">0</span>, Columns: <span id="matrix-cols" class="text-[var(--text-main)] font-bold">0</span>
+            </p>
     </div>
 </div>
 
@@ -199,37 +207,94 @@
     }
 
     function renderMatrix(json) {
-        const canvas = document.getElementById('matrix-canvas');
-        document.getElementById('keyboard-name').textContent = json.name || "";
-        canvas.innerHTML = '';
-        const UNIT = 45, GAP = 5;
-        let x = 0, y = 0;
+    const canvas = document.getElementById('matrix-canvas');
+    document.getElementById('keyboard-name').textContent = json.name || "Custom Board";
+    canvas.innerHTML = '';
 
-        if (!json.layouts || !json.layouts.keymap) return;
+    let keymapRows = [];
+    let rowsCount = 0;
+    let colsCount = 0;
 
-        json.layouts.keymap.forEach(row => {
-            let w = 1, h = 1;
-            row.forEach(item => {
-                if (typeof item === 'object') {
-                    if (item.x) x += item.x;
-                    if (item.y) y += item.y;
-                    if (item.w) w = item.w;
-                    if (item.h) h = item.h;
-                } else {
-                    const div = document.createElement('div');
-                    div.className = 'absolute bg-[#374151] border border-[#4B5563] border-b-[4px] border-b-[#1F2937] rounded-md flex items-center justify-center text-[10px] font-semibold text-gray-300 select-none shadow-sm';
-                    div.style.width = (w * UNIT - GAP) + 'px';
-                    div.style.height = (h * UNIT - GAP) + 'px';
-                    div.style.left = (x * UNIT) + 'px';
-                    div.style.top = (y * UNIT) + 'px';
-                    div.textContent = item.split('\n')[0];
-                    canvas.appendChild(div);
-                    x += w; w = 1; h = 1;
-                }
-            });
-            x = 0; y += 1;
-        });
+    // 1. Detect ColorHoster Custom Format
+    if (json.layouts && json.layouts.keymap) {
+        keymapRows = json.layouts.keymap;
     }
+    // 2. Detect standard VIA/QMK Format
+    else if (json.layouts) {
+        const layoutKey = Object.keys(json.layouts)[0];
+        if (layoutKey && json.layouts[layoutKey].layout) {
+            const layoutArray = json.layouts[layoutKey].layout;
+
+            // Calculate matrix limits for VIA format using coordinates
+            let maxRow = 0;
+            let maxCol = 0;
+            layoutArray.forEach(key => {
+                if (key.y !== undefined && Math.floor(key.y) > maxRow) maxRow = Math.floor(key.y);
+                if (key.x !== undefined && Math.floor(key.x) > maxCol) maxCol = Math.floor(key.x);
+            });
+            rowsCount = maxRow + 1;
+            colsCount = maxCol + 1;
+
+            // Update subheader figures
+            document.getElementById('matrix-rows').textContent = rowsCount;
+            document.getElementById('matrix-cols').textContent = colsCount;
+
+            renderVIAMatrix(canvas, layoutArray);
+            return;
+        }
+    }
+    // 3. Detect raw KLE Array Format
+    else if (Array.isArray(json) && Array.isArray(json[0])) {
+        keymapRows = json;
+    }
+
+    // Safety check if format is unrecognized
+    if (keymapRows.length === 0) {
+        canvas.innerHTML = '<p class="text-red-400 text-center mt-32">Unsupported JSON format.</p>';
+        document.getElementById('matrix-rows').textContent = '0';
+        document.getElementById('matrix-cols').textContent = '0';
+        return;
+    }
+
+    // Calculate dimensions for row-by-row configurations
+    rowsCount = keymapRows.length;
+    keymapRows.forEach(row => {
+        // Evaluate the total amount of unique keys configured in a single row line
+        let keysInRow = row.filter(item => typeof item !== 'object').length;
+        if (keysInRow > colsCount) colsCount = keysInRow;
+    });
+
+    // Update subheader figures
+    document.getElementById('matrix-rows').textContent = rowsCount;
+    document.getElementById('matrix-cols').textContent = colsCount;
+
+    // Process standard row-based formatting and render keys
+    const UNIT = 45, GAP = 5;
+    let x = 0, y = 0;
+
+    keymapRows.forEach(row => {
+        let w = 1, h = 1;
+        row.forEach(item => {
+            if (typeof item === 'object') {
+                if (item.x) x += item.x;
+                if (item.y) y += item.y;
+                if (item.w) w = item.w;
+                if (item.h) h = item.h;
+            } else {
+                const div = document.createElement('div');
+                div.className = 'absolute bg-[#374151] border border-[#4B5563] border-b-[4px] border-b-[#1F2937] rounded-md flex items-center justify-center text-[10px] font-semibold text-gray-300 select-none shadow-sm';
+                div.style.width = (w * UNIT - GAP) + 'px';
+                div.style.height = (h * UNIT - GAP) + 'px';
+                div.style.left = (x * UNIT) + 'px';
+                div.style.top = (y * UNIT) + 'px';
+                div.textContent = item.split('\n')[0];
+                canvas.appendChild(div);
+                x += w; w = 1; h = 1;
+            }
+        });
+        x = 0; y += 1;
+    });
+}
 
     function applyTheme(themeColors) {
         const root = document.documentElement;
