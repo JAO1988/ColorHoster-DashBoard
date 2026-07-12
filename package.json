@@ -1,0 +1,24 @@
+{
+  "name": "colorhoster-web",
+  "version": "1.0.0",
+  "description": "Web interface bridge for the ColorHoster OpenRGB server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "openrgb",
+    "colorhoster",
+    "via"
+  ],
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.4",
+    "tail": "^2.2.6",
+    "toml": "^3.0.0",
+    "tomlify-j0.4": "^3.0.0"
+  },
+  "type": "commonjs"
+}
