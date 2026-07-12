@@ -4,6 +4,10 @@ const path = require('path');
 const toml = require('toml');
 const tomlify = require('tomlify-j0.4');
 const { Tail } = require('tail');
+
+// Import the new LED Tester Utility
+const ColorHosterLEDTester = require('./utils/config_tester');
+
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
@@ -63,10 +67,41 @@ app.post('/api/settings/apply', (req, res) => {
     }
 });
 
+// --- NEW API ENDPOINT: Test Physical LED ---
+app.post('/api/test-led', (req, res) => {
+    const { ledIndex } = req.body;
+
+    if (ledIndex === undefined) {
+        return res.status(400).json({ error: "Missing ledIndex in request body" });
+    }
+
+    try {
+        // Read the current port dynamically from the TOML
+        const configPath = path.join(projectPath, 'colorhoster.toml');
+        let currentPort = 6742; // Default fallback
+
+        if (fs.existsSync(configPath)) {
+            const config = toml.parse(fs.readFileSync(configPath, 'utf-8'));
+            if (config.port) {
+                currentPort = parseInt(config.port, 10);
+            }
+        }
+
+        // Initialize and fire the tester
+        // Change 'tcp' to 'udp' here if ColorHoster strictly expects UDP packets
+        const ledTester = new ColorHosterLEDTester('127.0.0.1', currentPort, 'tcp');
+        ledTester.flashLedWhite(ledIndex);
+
+        res.json({ success: true, message: `Flashed LED ${ledIndex} on port ${currentPort}` });
+    } catch (e) {
+        console.error("Error triggering LED:", e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+// -------------------------------------------
+
 app.get('/api/layouts', (req, res) => {
-
-    const layoutDir = projectPath
-
+    const layoutDir = projectPath;
 
     if (!fs.existsSync(layoutDir)) {
         console.warn(`[Warning] Layouts folder not found at: ${layoutDir}`);
@@ -86,7 +121,6 @@ app.get('/api/layouts', (req, res) => {
 });
 
 app.get('/api/layout/:filename', (req, res) => {
-
     const filePath = path.join(projectPath, req.params.filename);
     res.sendFile(filePath);
 });
