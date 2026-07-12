@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        /* Fallback default colors before JavaScript loads */
         :root {
             --bg-base: #111827;
             --bg-panel: #1f2937;
@@ -27,7 +26,7 @@
         <h1 class="text-4xl font-extrabold text-[var(--text-main)] tracking-tight">
             ColorHoster <span class="text-[var(--accent)] transition-colors duration-300">Dashboard</span>
         </h1>
-        <p class="text-sm text-[var(--text-muted)] font-mono mt-1 opacity-80 font-bold">Version 0.1</p>
+        <p class="text-sm text-[var(--text-muted)] font-mono mt-1 opacity-80 font-bold">Version 0.1.1</p>
     </div>
 
     <div class="relative group z-50">
@@ -53,10 +52,9 @@
             </div>
         </div>
 
-        <div class="w-1/3">
-            <h2 class="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Device Configuration</h2>
-        </div>
-
+                <div class="w-1/3 flex items-center">
+            <h2 class="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">TOML Settings</h2>
+                </div>
     </div>
 
     <div class="flex gap-6 mb-6 h-[300px]">
@@ -81,8 +79,14 @@
         </div>
     </div>
 
-    <div class="bg-[var(--bg-panel)] p-6 rounded border border-[var(--border-color)] transition-colors duration-300 shadow-md">
-        <h3 class="font-bold text-[var(--accent)] mb-4 transition-colors duration-300">LED Matrix Layout - <span id="keyboard-name" class="text-[var(--text-muted)] italic text-sm font-normal"></span></h3>
+            <div class="bg-[var(--bg-panel)] p-6 rounded border border-[var(--border-color)] transition-colors duration-300 shadow-md flex flex-col">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-bold text-[var(--accent)] transition-colors duration-300">LED Matrix Layout - <span id="keyboard-name" class="text-[var(--text-muted)] italic text-sm font-normal"></span></h3>
+
+            <select id="layout-selector" onchange="loadSelectedLayout()" class="bg-[var(--bg-base)] text-[var(--text-main)] border border-[var(--border-color)] text-sm px-3 py-1.5 rounded cursor-pointer focus:border-[var(--accent)] outline-none transition-colors duration-300 shadow-inner">
+            </select>
+        </div>
+
         <div id="matrix-canvas" class="bg-[var(--bg-inset)] p-4 rounded border border-[var(--border-color)] relative overflow-x-auto transition-colors duration-300 shadow-inner" style="height: 350px; min-width: 1000px;">
             <p class="text-[var(--text-muted)] text-center mt-32">Loading layout...</p>
         </div>
@@ -95,9 +99,9 @@
     const statusDot = document.getElementById('status-dot');
     const statusText = document.getElementById('status-text');
 
-function checkLogForStatus(text) {
+    // --- SOCKET AND LOG LOGIC ---
+    function checkLogForStatus(text) {
         const lower = text.toLowerCase();
-
         if (lower.includes("disconnected")) {
             statusDot.className = "w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]";
             statusText.textContent = "Inactive";
@@ -135,6 +139,7 @@ function checkLogForStatus(text) {
         logContainer.scrollTop = logContainer.scrollHeight;
     });
 
+
     async function fetchSettings() {
         try {
             const res = await fetch('/api/settings', { cache: "no-store" });
@@ -143,48 +148,6 @@ function checkLogForStatus(text) {
             document.getElementById('setting-port').value = data.port || '';
             document.getElementById('brightness-toggle').checked = !!data.brightness;
         } catch (e) { console.error("Settings load failed"); }
-    }
-
-    async function fetchLayout() {
-        try {
-            const res = await fetch('/api/layout');
-            const data = await res.json();
-            renderMatrix(data);
-        } catch (e) {
-            document.getElementById('matrix-canvas').innerHTML = '<p class="text-red-500 p-4">Error loading layout.</p>';
-        }
-    }
-
-    function renderMatrix(json) {
-        const canvas = document.getElementById('matrix-canvas');
-        document.getElementById('keyboard-name').textContent = json.name || "";
-        canvas.innerHTML = '';
-        const UNIT = 45, GAP = 5;
-        let x = 0, y = 0;
-
-        json.layouts.keymap.forEach(row => {
-            let w = 1, h = 1;
-            row.forEach(item => {
-                if (typeof item === 'object') {
-                    if (item.x) x += item.x;
-                    if (item.y) y += item.y;
-                    if (item.w) w = item.w;
-                    if (item.h) h = item.h;
-                } else {
-                    const div = document.createElement('div');
-                    // The keys remain their standard mechanical gray so they don't get lost in the theme colors
-                    div.className = 'absolute bg-[#374151] border border-[#4B5563] border-b-[4px] border-b-[#1F2937] rounded-md flex items-center justify-center text-[10px] font-semibold text-gray-300 select-none shadow-sm';
-                    div.style.width = (w * UNIT - GAP) + 'px';
-                    div.style.height = (h * UNIT - GAP) + 'px';
-                    div.style.left = (x * UNIT) + 'px';
-                    div.style.top = (y * UNIT) + 'px';
-                    div.textContent = item.split('\n')[0];
-                    canvas.appendChild(div);
-                    x += w; w = 1; h = 1;
-                }
-            });
-            x = 0; y += 1;
-        });
     }
 
     async function applySettings() {
@@ -205,47 +168,100 @@ function checkLogForStatus(text) {
         }
     }
 
+    async function fetchLayoutList() {
+        try {
+            const res = await fetch('/api/layouts');
+            const files = await res.json();
+            const selector = document.getElementById('layout-selector');
+            selector.innerHTML = ''; // Clear previous
+
+            files.forEach(file => {
+                const option = document.createElement('option');
+                option.value = file;
+                option.textContent = file.replace('.json', '');
+                selector.appendChild(option);
+            });
+
+            if (files.length > 0) loadSelectedLayout();
+        } catch (e) { console.error("Failed to load layouts", e); }
+    }
+
+    async function loadSelectedLayout() {
+        const filename = document.getElementById('layout-selector').value;
+        if (!filename) return;
+        try {
+            const res = await fetch(`/api/layout/${filename}`);
+            const data = await res.json();
+            renderMatrix(data);
+        } catch (e) {
+            console.error("Layout load failed", e);
+        }
+    }
+
+    function renderMatrix(json) {
+        const canvas = document.getElementById('matrix-canvas');
+        document.getElementById('keyboard-name').textContent = json.name || "";
+        canvas.innerHTML = '';
+        const UNIT = 45, GAP = 5;
+        let x = 0, y = 0;
+
+        if (!json.layouts || !json.layouts.keymap) return;
+
+        json.layouts.keymap.forEach(row => {
+            let w = 1, h = 1;
+            row.forEach(item => {
+                if (typeof item === 'object') {
+                    if (item.x) x += item.x;
+                    if (item.y) y += item.y;
+                    if (item.w) w = item.w;
+                    if (item.h) h = item.h;
+                } else {
+                    const div = document.createElement('div');
+                    div.className = 'absolute bg-[#374151] border border-[#4B5563] border-b-[4px] border-b-[#1F2937] rounded-md flex items-center justify-center text-[10px] font-semibold text-gray-300 select-none shadow-sm';
+                    div.style.width = (w * UNIT - GAP) + 'px';
+                    div.style.height = (h * UNIT - GAP) + 'px';
+                    div.style.left = (x * UNIT) + 'px';
+                    div.style.top = (y * UNIT) + 'px';
+                    div.textContent = item.split('\n')[0];
+                    canvas.appendChild(div);
+                    x += w; w = 1; h = 1;
+                }
+            });
+            x = 0; y += 1;
+        });
+    }
+
+    function applyTheme(themeColors) {
+        const root = document.documentElement;
+        Object.keys(themeColors).forEach(key => root.style.setProperty(key, themeColors[key]));
+        localStorage.setItem('selectedTheme', JSON.stringify(themeColors));
+    }
+
     async function loadThemes() {
         try {
             const res = await fetch('/themes.json');
             const themes = await res.json();
             const menu = document.getElementById('theme-menu');
-
             Object.keys(themes).forEach(name => {
                 const link = document.createElement('a');
                 link.href = "#";
-                // Styled dropdown items
                 link.className = "block px-4 py-2 text-sm text-[var(--text-main)] hover:bg-[var(--accent)] hover:text-white transition-colors duration-150";
                 link.textContent = name;
-                link.onclick = (e) => {
-                    e.preventDefault();
-                    applyTheme(themes[name]);
-                };
+                link.onclick = (e) => { e.preventDefault(); applyTheme(themes[name]); };
                 menu.appendChild(link);
             });
-        } catch (e) {
-            console.error("Failed to load themes", e);
-        }
-    }
-
-    function applyTheme(themeColors) {
-        const root = document.documentElement;
-        // Loop through the CSS variables in the JSON and apply them to the :root
-        Object.keys(themeColors).forEach(key => {
-            root.style.setProperty(key, themeColors[key]);
-        });
-        localStorage.setItem('selectedTheme', JSON.stringify(themeColors));
+        } catch (e) { console.error("Failed to load themes", e); }
     }
 
     window.onload = () => {
         const savedTheme = localStorage.getItem('selectedTheme');
-        if (savedTheme) {
-            applyTheme(JSON.parse(savedTheme));
-        }
+        if (savedTheme) applyTheme(JSON.parse(savedTheme));
+
         fetchSettings();
-        fetchLayout();
+        fetchLayoutList();
         loadThemes();
     };
+
 </script>
 </body>
 </html>

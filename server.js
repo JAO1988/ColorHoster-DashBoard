@@ -63,17 +63,32 @@ app.post('/api/settings/apply', (req, res) => {
     }
 });
 
-// Layout API
-app.get('/api/layout', (req, res) => {
-    try {
-        const files = fs.readdirSync(projectPath);
-        const jsonFile = files.find(f => f.endsWith('.json'));
-        if (!jsonFile) throw new Error("No JSON found");
-        const content = JSON.parse(fs.readFileSync(path.join(projectPath, jsonFile), 'utf-8'));
-        res.json(content);
-    } catch (e) {
-        res.status(500).json({ error: "Layout not found" });
+app.get('/api/layouts', (req, res) => {
+
+    const layoutDir = projectPath
+
+
+    if (!fs.existsSync(layoutDir)) {
+        console.warn(`[Warning] Layouts folder not found at: ${layoutDir}`);
+        return res.json([]);
     }
+
+    fs.readdir(layoutDir, (err, files) => {
+        if (err) {
+            console.error("Error reading layouts directory:", err);
+            return res.status(500).json({ error: "Cannot read layouts" });
+        }
+
+        const jsonFiles = files.filter(file => file.endsWith('.json'));
+        console.log(`[Success] Found ${jsonFiles.length} layout files at ${layoutDir}`);
+        res.json(jsonFiles);
+    });
+});
+
+app.get('/api/layout/:filename', (req, res) => {
+
+    const filePath = path.join(projectPath, req.params.filename);
+    res.sendFile(filePath);
 });
 
 // Log Tailing
