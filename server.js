@@ -12,12 +12,69 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 
+const origLog = console.log;
+const origError = console.error;
+const origWarn = console.warn;
+const origInfo = console.info;
+
+function broadcastDashboardLog(msg, isError = false) {
+    const formattedMsg = `[Dashboard] ${msg}`;
+    if (io) {
+        io.emit('log_update', formattedMsg);
+
+        // Retain the service offline error catch
+        if (isError && (msg.includes('TCP Error: connect ECONNREFUSED') || msg.includes('ECONNREFUSED'))) {
+            io.emit('service_error');
+        }
+    }
+}
+
+console.log = function(...args) {
+    origLog.apply(console, args);
+    broadcastDashboardLog(args.join(' '));
+};
+console.error = function(...args) {
+    origError.apply(console, args);
+    broadcastDashboardLog(args.join(' '), true);
+};
+console.warn = function(...args) {
+    origWarn.apply(console, args);
+    broadcastDashboardLog(args.join(' '));
+};
+console.info = function(...args) {
+    origInfo.apply(console, args);
+    broadcastDashboardLog(args.join(' '));
+};
+
 app.use(express.json());
 app.use(express.static('public'));
 
 // Load project path from the local config file
 const serverConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf-8'));
 const projectPath = serverConfig.projectPath;
+
+function checkKeyboardJson() {
+    try {
+        if (!fs.existsSync(projectPath)) return false;
+        const files = fs.readdirSync(projectPath);
+        return files.some(file => file.toLowerCase().endsWith('.json'));
+    } catch (err) {
+        console.error("Error reading project path for JSON files:", err);
+        return false;
+    }
+}
+
+// NEW: Watch the directory for file changes and alert the dashboard
+try {
+    fs.watch(projectPath, (eventType, filename) => {
+        // If a file changes, and it's a JSON file (or if the filename is temporarily null), re-check the directory
+        if (!filename || filename.toLowerCase().endsWith('.json')) {
+            if (io) io.emit('keyboard_json_status', checkKeyboardJson());
+        }
+    });
+} catch (err) {
+    console.error("Could not initialize file watcher on project path:", err);
+}
 
 // Settings API: Reads TOML
 app.get('/api/settings', (req, res) => {
@@ -95,6 +152,12 @@ app.post('/api/test-led', (req, res) => {
         res.json({ success: true, message: `Flashed LED ${ledIndex} on port ${currentPort}` });
     } catch (e) {
         console.error("Error triggering LED:", e);
+
+        // NEW: Also catch it if it bubbles up as a standard error object
+        if (e.message && e.message.includes('ECONNREFUSED')) {
+            io.emit('service_error');
+        }
+
         res.status(500).json({ success: false, error: e.message });
     }
 });
@@ -130,12 +193,23 @@ const IS_WIN = process.platform === 'win32';
 const LOG_PATH = IS_WIN ? 'C:\\Windows\\Temp\\colorhoster.log' : '/tmp/colorhoster.log';
 
 const tail = new Tail(LOG_PATH, { follow: true, logger: console });
-tail.on("line", (data) => io.emit('log_update', data));
+
+// ADD [Service] prefix to live tail updates
+tail.on("line", (data) => io.emit('log_update', `[Service] ${data}`));
 
 io.on('connection', (socket) => {
+    socket.emit('keyboard_json_status', checkKeyboardJson());
     if (fs.existsSync(LOG_PATH)) {
         fs.readFile(LOG_PATH, 'utf-8', (err, data) => {
-            if (!err) socket.emit('log_snapshot', data);
+            if (!err) {
+                // ADD [Service] prefix to historical snapshot lines
+                const formattedSnapshot = data.split('\n')
+                .filter(line => line.trim() !== '')
+                .map(line => `[Service] ${line}`)
+                .join('\n');
+
+                socket.emit('log_snapshot', formattedSnapshot);
+            }
         });
     }
 });

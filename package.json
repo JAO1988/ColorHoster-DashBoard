@@ -1,7 +1,7 @@
 {
   "name": "colorhoster-web",
   "version": "1.0.0",
-  "description": "Web interface bridge for the ColorHoster OpenRGB server",
+  "description": "Web interface dashboard for the ColorHoster OpenRGB server",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
