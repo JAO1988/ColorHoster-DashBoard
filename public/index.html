@@ -26,7 +26,7 @@
         <h1 class="text-4xl font-extrabold text-[var(--text-main)] tracking-tight">
             ColorHoster <span class="text-[var(--accent)] transition-colors duration-300">Dashboard</span>
         </h1>
-        <p class="text-sm text-[var(--text-muted)] font-mono mt-1 opacity-80 font-bold">Version 0.1.1</p>
+        <p class="text-sm text-[var(--text-muted)] font-mono mt-1 opacity-80 font-bold">Version 0.1.4</p>
     </div>
 
     <div class="relative group z-50">
@@ -45,10 +45,16 @@
         <div class="flex-grow flex items-center justify-between">
             <h2 class="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Logs</h2>
 
-            <div id="status-indicator" class="flex items-center gap-2">
-                <span class="text-xs font-bold text-[var(--accent)] uppercase tracking-wider">Client Status:</span>
-                <div id="status-dot" class="w-2 h-2 rounded-full bg-gray-500"></div>
-                <span id="status-text" class="text-[10px] text-[var(--text-muted)] uppercase italic tracking-wider">Checking...</span>
+                    <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-[var(--accent)] uppercase tracking-wider">Keyboard:</span>
+                    <div id="kbd-status-dot" class="w-2 h-2 rounded-full bg-gray-500"></div>
+                    <span id="kbd-status-text" class="text-[10px] text-[var(--text-muted)] uppercase italic tracking-wider">Disconnected</span>
+            </div>
+
+                    <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-[var(--accent)] uppercase tracking-wider">Client:</span>
+                    <div id="client-status-dot" class="w-2 h-2 rounded-full bg-gray-500"></div>
+                    <span id="client-status-text" class="text-[10px] text-[var(--text-muted)] uppercase italic tracking-wider">Checking...</span>
             </div>
         </div>
 
@@ -74,22 +80,29 @@
                 </label>
             </div>
             <button onclick="applySettings()" class="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white font-bold py-2.5 rounded transition-colors duration-300 shadow">
-                Apply Settings
+                Apply
             </button>
         </div>
     </div>
 
 <div class="bg-[var(--bg-panel)] p-6 rounded border border-[var(--border-color)] transition-colors duration-300 shadow-md flex flex-col">
-    <div class="flex justify-between items-start mb-4">
+    <div class="flex justify-between items-center mb-4">
         <div class="flex flex-col">
             <h3 class="font-bold text-[var(--accent)] transition-colors duration-300">
-                LED Matrix Layout - <span id="keyboard-name" class="text-[var(--text-muted)] italic text-sm font-normal"></span>
+                LED Matrix Tester - <span id="keyboard-name" class="text-[var(--text-muted)] italic text-sm font-normal"></span>
             </h3>
         </div>
+
+            <div class="flex items-center gap-6">
+            <div id="encoder-toggle-container" title="Ignore Encoder Wheel if it has no RGB" class="flex items-center gap-2 transition-opacity duration-300">
+                <input type="checkbox" id="ignore-encoder-toggle" class="w-4 h-4 accent-[var(--accent)] cursor-pointer disabled:cursor-not-allowed" checked onchange="loadSelectedLayout()">
+                <label for="ignore-encoder-toggle" class="text-xs text-[var(--text-muted)] uppercase font-semibold tracking-wider cursor-pointer select-none">Ignore Encoder</label>
+            </div>
 
             <select id="layout-selector" onchange="loadSelectedLayout()" class="bg-[var(--bg-base)] text-[var(--text-main)] border border-[var(--border-color)] text-sm px-3 py-1.5 rounded cursor-pointer focus:border-[var(--accent)] outline-none transition-colors duration-300 shadow-inner">
             </select>
         </div>
+    </div>
 
         <div id="matrix-canvas" class="bg-[var(--bg-inset)] p-4 rounded border border-[var(--border-color)] relative overflow-x-auto transition-colors duration-300 shadow-inner" style="height: 350px; min-width: 1000px;">
             <p class="text-[var(--text-muted)] text-center mt-32">Loading layout...</p>
@@ -110,14 +123,39 @@
     // --- SOCKET AND LOG LOGIC ---
     function checkLogForStatus(text) {
         const lower = text.toLowerCase();
-        if (lower.includes("disconnected")) {
-            statusDot.className = "w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]";
-            statusText.textContent = "Inactive";
-            statusText.className = "text-[10px] text-red-500 uppercase font-bold tracking-wider";
-        } else if (lower.includes("connected")) {
-            statusDot.className = "w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]";
-            statusText.textContent = "Active";
-            statusText.className = "text-[10px] text-green-500 uppercase font-bold tracking-wider";
+
+        // 1. Client Status Logic
+        // Update if the log line relates to a "client" (or isn't specifically about the keyboard)
+        if (!lower.includes("keyboard")) {
+            const clientDot = document.getElementById('client-status-dot');
+            const clientText = document.getElementById('client-status-text');
+
+            if (lower.includes("disconnected")) {
+                clientDot.className = "w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]";
+                clientText.textContent = "Inactive";
+                clientText.className = "text-[10px] text-red-500 uppercase font-bold tracking-wider";
+            } else if (lower.includes("connected")) {
+                clientDot.className = "w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]";
+                clientText.textContent = "Active";
+                clientText.className = "text-[10px] text-green-500 uppercase font-bold tracking-wider";
+            }
+        }
+
+        // 2. Keyboard Status Logic
+        // Update if the log line contains "keyboard"
+        if (lower.includes("keyboard")) {
+            const kbdDot = document.getElementById('kbd-status-dot');
+            const kbdText = document.getElementById('kbd-status-text');
+
+            if (lower.includes("connected")) {
+                kbdDot.className = "w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]";
+                kbdText.textContent = "Connected";
+                kbdText.className = "text-[10px] text-green-500 uppercase font-bold tracking-wider";
+            } else if (lower.includes("disconnected")) {
+                kbdDot.className = "w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]";
+                kbdText.textContent = "Disconnected";
+                kbdText.className = "text-[10px] text-red-500 uppercase font-bold tracking-wider";
+            }
         }
     }
 
@@ -126,6 +164,12 @@
     }
 
     function appendLogLine(text) {
+        // --- ADD THIS FILTER ---
+        if (text.includes("Client Unknown disconnected.")) {
+            return;
+        }
+
+
         if (!text.trim()) return;
         const cleanText = stripAnsi(text);
         checkLogForStatus(cleanText);
@@ -206,71 +250,77 @@
         }
     }
 
-    function renderMatrix(json) {
+async function testLed(index) {
+    try {
+        const response = await fetch('/api/test-led', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ledIndex: index })
+        });
+        if (!response.ok) throw new Error('Failed to reach server');
+    } catch (e) {
+        console.error("Hardware test failed:", e);
+    }
+}
+
+function renderMatrix(json) {
     const canvas = document.getElementById('matrix-canvas');
     document.getElementById('keyboard-name').textContent = json.name || "Custom Board";
     canvas.innerHTML = '';
 
-    let keymapRows = [];
-    let rowsCount = 0;
-    let colsCount = 0;
+    const ignoreEncoder = document.getElementById('ignore-encoder-toggle').checked;
 
-    // 1. Detect ColorHoster Custom Format
+    // 1. DETERMINE DATA FIRST
+    let keymapRows = [];
     if (json.layouts && json.layouts.keymap) {
         keymapRows = json.layouts.keymap;
-    }
-    // 2. Detect standard VIA/QMK Format
-    else if (json.layouts) {
-        const layoutKey = Object.keys(json.layouts)[0];
-        if (layoutKey && json.layouts[layoutKey].layout) {
-            const layoutArray = json.layouts[layoutKey].layout;
-
-            // Calculate matrix limits for VIA format using coordinates
-            let maxRow = 0;
-            let maxCol = 0;
-            layoutArray.forEach(key => {
-                if (key.y !== undefined && Math.floor(key.y) > maxRow) maxRow = Math.floor(key.y);
-                if (key.x !== undefined && Math.floor(key.x) > maxCol) maxCol = Math.floor(key.x);
-            });
-            rowsCount = maxRow + 1;
-            colsCount = maxCol + 1;
-
-            // Update subheader figures
-            document.getElementById('matrix-rows').textContent = rowsCount;
-            document.getElementById('matrix-cols').textContent = colsCount;
-
-            renderVIAMatrix(canvas, layoutArray);
-            return;
-        }
-    }
-    // 3. Detect raw KLE Array Format
-    else if (Array.isArray(json) && Array.isArray(json[0])) {
+    } else if (Array.isArray(json) && Array.isArray(json[0])) {
         keymapRows = json;
     }
 
-    // Safety check if format is unrecognized
     if (keymapRows.length === 0) {
         canvas.innerHTML = '<p class="text-red-400 text-center mt-32">Unsupported JSON format.</p>';
-        document.getElementById('matrix-rows').textContent = '0';
-        document.getElementById('matrix-cols').textContent = '0';
         return;
     }
 
-    // Calculate dimensions for row-by-row configurations
-    rowsCount = keymapRows.length;
+    let hasEncoder = false;
     keymapRows.forEach(row => {
-        // Evaluate the total amount of unique keys configured in a single row line
+        row.forEach(item => {
+            if (typeof item === 'string' && item.includes('\n\n\n')) {
+                hasEncoder = true;
+            }
+        });
+    });
+
+    const toggleInput = document.getElementById('ignore-encoder-toggle');
+    const toggleContainer = document.getElementById('encoder-toggle-container');
+
+    if (hasEncoder) {
+        toggleInput.disabled = false;
+        toggleContainer.classList.remove('opacity-40');
+        toggleContainer.title = "Ignore Encoder Wheel if it has no RGB";
+    } else {
+        toggleInput.disabled = true;
+        toggleContainer.classList.add('opacity-40');
+        toggleContainer.title = "No encoder detected in this layout";
+    }
+
+    // 2. CALCULATE DIMENSIONS
+    let rowsCount = keymapRows.length;
+    let colsCount = 0;
+
+    keymapRows.forEach(row => {
         let keysInRow = row.filter(item => typeof item !== 'object').length;
         if (keysInRow > colsCount) colsCount = keysInRow;
     });
 
-    // Update subheader figures
     document.getElementById('matrix-rows').textContent = rowsCount;
     document.getElementById('matrix-cols').textContent = colsCount;
 
-    // Process standard row-based formatting and render keys
+    // 3. RENDER
     const UNIT = 45, GAP = 5;
     let x = 0, y = 0;
+    let ledCounter = 0;
 
     keymapRows.forEach(row => {
         let w = 1, h = 1;
@@ -282,12 +332,40 @@
                 if (item.h) h = item.h;
             } else {
                 const div = document.createElement('div');
-                div.className = 'absolute bg-[#374151] border border-[#4B5563] border-b-[4px] border-b-[#1F2937] rounded-md flex items-center justify-center text-[10px] font-semibold text-gray-300 select-none shadow-sm';
+                div.className = 'absolute bg-[#374151] border border-[#4B5563] border-b-[4px] border-b-[#1F2937] rounded-md flex items-center justify-center text-[10px] font-semibold text-gray-300 select-none shadow-sm cursor-pointer transition-all hover:bg-[#4B5563] active:scale-95';
                 div.style.width = (w * UNIT - GAP) + 'px';
                 div.style.height = (h * UNIT - GAP) + 'px';
                 div.style.left = (x * UNIT) + 'px';
                 div.style.top = (y * UNIT) + 'px';
                 div.textContent = item.split('\n')[0];
+
+                // Check for the encoder notation (multiple newlines often ending in e0, e1, etc.)
+                const isEncoder = item.includes('\n\n\n');
+
+                let currentIndex = -1;
+
+                if (ignoreEncoder && isEncoder) {
+                    // Visually dim the encoder to show it's being skipped for LED testing
+                    div.style.opacity = '0.4';
+                    div.title = "Encoder (LED Index Ignored)";
+                } else {
+                    // Assign the current LED index and increment for the next valid key
+                    currentIndex = ledCounter;
+                    ledCounter++;
+                }
+
+                div.onclick = () => {
+                    div.classList.add('bg-white', 'text-black');
+                    setTimeout(() => div.classList.remove('bg-white', 'text-black'), 300);
+
+                    // Only send the API request if this isn't an ignored encoder
+                    if (currentIndex !== -1) {
+                        testLed(currentIndex);
+                    } else {
+                        console.log("Encoder clicked, no LED index assigned.");
+                    }
+                };
+
                 canvas.appendChild(div);
                 x += w; w = 1; h = 1;
             }

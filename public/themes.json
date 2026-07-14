@@ -44,7 +44,7 @@
     "--bg-panel": "#1f2430",
     "--bg-inset": "#00010a",
     "--text-main": "#b3b1ad",
-    "--text-muted": "#4d5566",
+    "--text-muted": "#d1d3d6",
     "--border-color": "#303640",
     "--accent": "#39bae6",
     "--accent-hover": "#59c2e6"
